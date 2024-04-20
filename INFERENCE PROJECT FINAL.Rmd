@@ -1,0 +1,552 @@
+---
+title: "INFERENCE PROJECT FINAL"
+author: "MICHAEL AHANA (T00728755)"
+date: "2024-04-20"
+output:
+  pdf_document: default
+  html_document: default
+---
+### Simulated data Normal
+```{r}
+# Load necessary libraries
+library(stats)
+
+# Simulation Setup
+set.seed(123)  # Set seed for reproducibility
+
+# Define parameters for the linear regression model
+beta_true <- c(2, 3)  # True coefficients: intercept = 2, slope = 3
+n <- 100  # Number of observations
+
+# Generate synthetic data
+x <- rnorm(n, mean = 5, sd = 2)  # Simulate independent variable
+y <- beta_true[1] + beta_true[2] * x + rnorm(n, mean = 0, sd = 1)  # Simulate dependent variable (with noise)
+
+# Combine into a data frame
+data <- data.frame(x, y)
+
+# Visualize the data
+plot(x, y, main = "Simulated Data", xlab = "x", ylab = "y")
+abline(lm(y ~ x), col = "red")  # Add true regression line
+
+# Estimate parameters using Ordinary Least Squares (OLS) method
+lm_model <- lm(y ~ x, data = data)
+beta_ols <- coef(lm_model)
+
+# Print estimated coefficients
+cat("Estimated coefficients using OLS:")
+print(beta_ols)
+
+```
+
+###Impliment Newton raphson 
+```{r}
+# Define the Newton-Raphson algorithm for parameter estimation
+newton_raphson <- function(x, y, beta_initial, tol = 1e-6, max_iter = 100) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    grad <- likelihood_gradient(beta, x, y)
+    hess <- likelihood_hessian(beta, x, y)
+    delta <- solve(hess, grad)
+    beta_new <- beta - delta
+    if (max(abs(beta_new - beta)) < tol) {
+      break  # Convergence criteria met
+    }
+    beta <- beta_new
+  }
+  return(beta)
+}
+
+# Initial guess for parameter estimates
+beta_initial <- c(0, 0)
+
+# Estimate parameters using Newton-Raphson method
+beta_nr <- newton_raphson(x, y, beta_initial)
+
+# Print estimated coefficients
+cat("Estimated coefficients using Newton-Raphson:")
+print(beta_nr)
+
+```
+
+### Implimenting the Fisher scoring
+```{r}
+# Define the Fisher information matrix for linear regression
+fisher_information <- function(beta, x) {
+  n <- length(x)
+  fisher <- matrix(0, nrow = 2, ncol = 2)
+  mu <- beta[1] + beta[2] * x
+  fisher[1, 1] <- n
+  fisher[2, 2] <- sum((x^2) * dnorm(mu, mean = mu, sd = 1, log = FALSE))
+  fisher[1, 2] <- fisher[2, 1] <- sum(x * dnorm(mu, mean = mu, sd = 1, log = FALSE))
+  return(fisher)
+}
+
+# Implement the Fisher scoring algorithm with adjustments
+fisher_scoring_adjusted <- function(x, y, beta_initial, learning_rate = 0.01, tol = 1e-6, max_iter = 1000) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    grad <- likelihood_gradient(beta, x, y)
+    fisher <- fisher_information(beta, x)
+    delta <- solve(fisher) %*% grad
+    beta <- beta - learning_rate * delta  # Adjusted step size
+    if (sqrt(sum(delta^2)) < tol) {
+      break  # Convergence criteria met
+    }
+  }
+  return(beta)
+}
+
+# Initial guess for parameter estimates closer to the true values
+beta_initial_adjusted <- c(2, 3)
+
+# Estimate parameters using Fisher Scoring algorithm with adjustments
+beta_fs_adjusted <- fisher_scoring_adjusted(x, y, beta_initial_adjusted)
+
+# Print estimated coefficients
+cat("Estimated coefficients using Fisher Scoring")
+print(beta_fs_adjusted)
+
+```
+
+
+```{r}
+# Expectation-Maximization (EM) algorithm for parameter estimation
+em_algorithm <- function(x, y, beta_initial, tol = 1e-6, max_iter = 100) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    # E-step: Compute the conditional expectations of the latent variables
+    mu <- beta[1] + beta[2] * x
+    w <- dnorm(y, mean = mu, sd = 1) / rowSums(outer(dnorm(y, mean = mu, sd = 1), c(1,0)))
+    
+    # M-step: Update the parameter estimates
+    beta_new <- c(sum(w * y) / sum(w), sum(w * y * x) / sum(w * x^2))
+    
+    # Check for convergence
+    if (max(abs(beta_new - beta)) < tol) {
+      break  # Convergence criteria met
+    }
+    
+    beta <- beta_new
+  }
+  return(beta)
+}
+
+# Initial guess for parameter estimates
+beta_initial <- c(0, 0)
+
+# Estimate parameters using EM algorithm
+beta_em <- em_algorithm(x, y, beta_initial)
+
+# Print estimated coefficients
+cat("Estimated coefficients using EM algorithm:")
+print(beta_em)
+
+```
+
+```{r}
+# Define the EM algorithm for parameter estimation
+em_algorithm <- function(x, y, beta_initial, tol = 1e-6, max_iter = 100) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    # E-step: Compute the expected values of the latent variables (missing data)
+    mu <- beta[1] + beta[2] * x
+    sigma2 <- 1  # Assume constant variance for simplicity
+    weights <- dnorm(y, mean = mu, sd = sqrt(sigma2))
+    
+    # M-step: Update parameter estimates using the expected values
+    x_weighted <- sum(weights * x)
+    y_weighted <- sum(weights * y)
+    x_sq_weighted <- sum(weights * x^2)
+    xy_weighted <- sum(weights * x * y)
+    beta_new <- solve(matrix(c(n, x_weighted, x_weighted, x_sq_weighted), ncol = 2), c(sum(weights * mu), xy_weighted))
+    
+    # Check for convergence
+    if (max(abs(beta_new - beta)) < tol) {
+      break  # Convergence criteria met
+    }
+    
+    beta <- beta_new
+  }
+  return(beta)
+}
+
+# Initial guess for parameter estimates
+beta_initial <- c(0, 0)
+
+# Estimate parameters using EM algorithm
+beta_em <- em_algorithm(x, y, beta_initial)
+
+# Print estimated coefficients
+cat("Estimated coefficients using EM algorithm:")
+print(beta_em)
+
+```
+```{r}
+# Adjust initial guess for parameter estimates
+beta_initial <- c(1, 1)
+
+# Estimate parameters using EM algorithm with adjusted initial guess, convergence criteria, and maximum iterations
+beta_em <- em_algorithm(x, y, beta_initial, tol = 1e-8, max_iter = 1000)
+
+# Print estimated coefficients
+cat("Estimated coefficients using EM algorithm:")
+print(beta_em)
+
+```
+
+```{r}
+# Function to compare Newton-Raphson and Fisher Scoring methods
+compare_methods <- function(n_simulations = 100, n = 100, noise_sd = 1) {
+  results <- matrix(0, nrow = n_simulations, ncol = 3)  # Store MSE, iterations, and convergence
+  for (i in 1:n_simulations) {
+    # Generate synthetic data
+    set.seed(i)  # Set different seed for each simulation
+    x <- rnorm(n, mean = 5, sd = 2)
+    y <- beta_true[1] + beta_true[2] * x + rnorm(n, mean = 0, sd = noise_sd)
+    
+    # Estimate parameters using Newton-Raphson method
+    beta_nr <- newton_raphson(x, y, beta_initial)
+    
+    # Estimate parameters using Fisher Scoring method
+    beta_fs <- fisher_scoring_adjusted(x, y, beta_initial_adjusted)
+    
+    # Calculate mean squared error (MSE) for each method
+    mse_nr <- sum((beta_nr - beta_true)^2) / length(beta_true)
+    mse_fs <- sum((beta_fs - beta_true)^2) / length(beta_true)
+    
+    # Store MSE and convergence information
+    results[i, 1] <- mse_nr
+    results[i, 2] <- ifelse(sqrt(sum((beta_nr - beta_true)^2)) < 1e-6, 1, 0)  # Convergence flag for NR
+    results[i, 3] <- ifelse(sqrt(sum((beta_fs - beta_true)^2)) < 1e-6, 1, 0)  # Convergence flag for FS
+  }
+  
+  # Calculate average MSE, convergence rate, and convergence speed
+  avg_mse_nr <- mean(results[, 1])
+  avg_mse_fs <- mean(results[, 2])
+  convergence_rate_nr <- mean(results[, 2])
+  convergence_rate_fs <- mean(results[, 3])
+  
+  # Print results
+  cat("Average MSE (Newton-Raphson):", avg_mse_nr, "\n")
+  cat("Average MSE (Fisher Scoring):", avg_mse_fs, "\n")
+  cat("Convergence Rate (Newton-Raphson):", convergence_rate_nr, "\n")
+  cat("Convergence Rate (Fisher Scoring):", convergence_rate_fs, "\n")
+}
+
+# Perform comparison
+compare_methods(n_simulations = 100, n = 100, noise_sd = 1)
+
+```
+```{r}
+# Function to compare EM algorithm
+compare_em <- function(n_simulations = 100, n = 100, noise_sd = 1) {
+  results <- matrix(0, nrow = n_simulations, ncol = 2)  # Store MSE and convergence
+  for (i in 1:n_simulations) {
+    # Generate synthetic data
+    set.seed(i)  # Set different seed for each simulation
+    x <- rnorm(n, mean = 5, sd = 2)
+    y <- beta_true[1] + beta_true[2] * x + rnorm(n, mean = 0, sd = noise_sd)
+    
+    # Estimate parameters using EM algorithm
+    beta_em <- em_algorithm(x, y, beta_initial)
+    
+    # Calculate mean squared error (MSE) for EM algorithm
+    mse_em <- sum((beta_em - beta_true)^2) / length(beta_true)
+    
+    # Store MSE and convergence information
+    results[i, 1] <- mse_em
+    results[i, 2] <- ifelse(sqrt(sum((beta_em - beta_true)^2)) < 1e-6, 1, 0)  # Convergence flag for EM
+  }
+  
+  # Calculate average MSE and convergence rate
+  avg_mse_em <- mean(results[, 1])
+  convergence_rate_em <- mean(results[, 2])
+  
+  # Print results
+  cat("Average MSE (EM Algorithm):", avg_mse_em, "\n")
+  cat("Convergence Rate (EM Algorithm):", convergence_rate_em, "\n")
+}
+
+# Perform comparison for EM algorithm
+compare_em(n_simulations = 100, n = 100, noise_sd = 1)
+
+```
+
+### Simulated data Binomial
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Define parameters for the logistic regression model
+beta_true_logistic <- c(-2, 0.5)  # True coefficients: intercept = -2, slope = 0.5
+n <- 100  # Number of observations
+
+# Generate synthetic data for logistic regression
+x_logistic <- rnorm(n, mean = 5, sd = 2)  # Simulate independent variable
+log_odds <- beta_true_logistic[1] + beta_true_logistic[2] * x_logistic
+prob <- 1 / (1 + exp(-log_odds))
+y_logistic <- rbinom(n, size = 1, prob = prob)
+
+# Combine into a data frame
+data_logistic <- data.frame(x = x_logistic, y = y_logistic)
+
+# Visualize the data
+plot(x_logistic, y_logistic, main = "Simulated Data (Logistic Regression)", xlab = "x", ylab = "y", pch = 19, col = ifelse(y_logistic == 1, "blue", "red"))
+abline(v = median(x_logistic), col = "green", lty = 2)  # Add vertical line at the median of x
+legend("topright", legend = c("y = 0", "y = 1"), pch = 19, col = c("red", "blue"))
+
+# Estimate parameters using Logistic Regression (Maximum Likelihood Estimation)
+logistic_model <- glm(y ~ x, data = data_logistic, family = binomial)
+beta_logistic <- coef(logistic_model)
+
+# Print estimated coefficients
+cat("Estimated coefficients using Logistic Regression:")
+print(beta_logistic)
+
+```
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Define parameters for the logistic regression model
+beta_true_logistic <- c(-2, 0.5)  # True coefficients: intercept = -2, slope = 0.5
+n <- 100  # Number of observations
+
+# Generate synthetic data for logistic regression
+x_logistic <- rnorm(n, mean = 5, sd = 2)  # Simulate independent variable
+log_odds <- beta_true_logistic[1] + beta_true_logistic[2] * x_logistic
+prob <- 1 / (1 + exp(-log_odds))
+y_logistic <- rbinom(n, size = 1, prob = prob)
+
+# Combine into a data frame
+data_logistic <- data.frame(x = x_logistic, y = y_logistic)
+
+# Fit logistic regression model using binomial family
+logistic_model <- glm(y ~ x, data = data_logistic, family = binomial)
+
+# Print model summary
+summary(logistic_model)
+
+```
+
+### Impliment the Newton raphson for the logistic regression
+```{r}
+# Define the likelihood function for logistic regression
+log_likelihood <- function(beta, x, y) {
+  log_odds <- beta[1] + beta[2] * x
+  prob <- 1 / (1 + exp(-log_odds))
+  ll <- sum(y * log(prob) + (1 - y) * log(1 - prob))
+  return(-ll)  # Return negative log-likelihood for minimization
+}
+
+# Define the gradient of the likelihood function
+log_likelihood_gradient <- function(beta, x, y) {
+  log_odds <- beta[1] + beta[2] * x
+  prob <- 1 / (1 + exp(-log_odds))
+  grad <- c(sum(prob - y), sum((prob - y) * x))
+  return(grad)
+}
+
+# Define the Hessian of the likelihood function
+log_likelihood_hessian <- function(beta, x) {
+  log_odds <- beta[1] + beta[2] * x
+  prob <- 1 / (1 + exp(-log_odds))
+  n <- length(x)
+  X <- cbind(rep(1, n), x)
+  W <- diag(prob * (1 - prob))
+  hess <- t(X) %*% W %*% X
+  return(hess)
+}
+
+# Implement the Newton-Raphson algorithm
+newton_raphson_logistic <- function(x, y, beta_initial, tol = 1e-6, max_iter = 1000) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    grad <- log_likelihood_gradient(beta, x, y)
+    hess <- log_likelihood_hessian(beta, x)
+    delta <- solve(hess) %*% grad
+    beta <- beta - delta
+    if (sqrt(sum(delta^2)) < tol) {
+      break  # Convergence criteria met
+    }
+  }
+  return(beta)
+}
+
+# Initial guess for parameter estimates
+beta_initial_logistic <- c(0, 0)
+
+# Estimate parameters using Newton-Raphson method for logistic regression
+beta_nr_logistic <- newton_raphson_logistic(x_logistic, y_logistic, beta_initial_logistic)
+
+# Print estimated coefficients
+cat("Estimated coefficients using Newton-Raphson (Logistic Regression):")
+print(beta_nr_logistic)
+
+```
+### Impliment the Fisher scoring for the logistic regression
+```{r}
+# Define the Fisher information matrix for logistic regression
+fisher_information_logistic <- function(beta, x) {
+  log_odds <- beta[1] + beta[2] * x
+  prob <- 1 / (1 + exp(-log_odds))
+  n <- length(x)
+  X <- cbind(rep(1, n), x)
+  W <- diag(prob * (1 - prob))
+  fisher <- t(X) %*% W %*% X
+  return(fisher)
+}
+
+# Implement the Fisher scoring algorithm for logistic regression
+fisher_scoring_logistic <- function(x, y, beta_initial, tol = 1e-6, max_iter = 1000) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    grad <- log_likelihood_gradient(beta, x, y)
+    fisher <- fisher_information_logistic(beta, x)
+    delta <- solve(fisher) %*% grad
+    beta <- beta - delta
+    if (sqrt(sum(delta^2)) < tol) {
+      break  # Convergence criteria met
+    }
+  }
+  return(beta)
+}
+
+# Initial guess for parameter estimates
+beta_initial_logistic <- c(0, 0)
+
+# Estimate parameters using Fisher Scoring algorithm for logistic regression
+beta_fs_logistic <- fisher_scoring_logistic(x_logistic, y_logistic, beta_initial_logistic)
+
+# Print estimated coefficients
+cat("Estimated coefficients using Fisher Scoring (Logistic Regression):")
+print(beta_fs_logistic)
+
+```
+```{r}
+# Implement the Expectation-Maximization (EM) algorithm for logistic regression
+em_algorithm_logistic <- function(x, y, beta_initial, tol = 1e-6, max_iter = 1000) {
+  beta <- beta_initial
+  for (iter in 1:max_iter) {
+    # E-step: Compute the expected values of the latent variables
+    log_odds <- beta[1] + beta[2] * x
+    prob <- 1 / (1 + exp(-log_odds))
+    w <- prob * (1 - prob)
+    
+    # M-step: Update the parameter estimates using weighted logistic regression
+    weights <- diag(w)
+    X <- cbind(rep(1, length(x)), x)
+    z <- solve(t(X) %*% weights %*% X) %*% t(X) %*% (y - prob)
+    beta_new <- beta + z
+    
+    # Check for convergence
+    if (sqrt(sum((beta_new - beta)^2)) < tol) {
+      beta <- beta_new
+      break
+    }
+    
+    beta <- beta_new
+  }
+  
+  return(beta)
+}
+
+# Initial guess for parameter estimates
+beta_initial_logistic <- c(0, 0)
+
+# Estimate parameters using EM algorithm for logistic regression
+beta_em_logistic <- em_algorithm_logistic(x_logistic, y_logistic, beta_initial_logistic)
+
+# Print estimated coefficients
+cat("Estimated coefficients using EM Algorithm (Logistic Regression):")
+print(beta_em_logistic)
+
+```
+
+
+
+```{r}
+# Define a function to conduct multiple simulations and compare algorithms
+compare_algorithms <- function(n_simulations, n, true_beta, tol = 1e-6, max_iter = 1000) {
+  # Initialize matrices to store results
+  results_accuracy <- matrix(NA, nrow = n_simulations, ncol = 3)  # Columns: Newton-Raphson, Fisher Scoring, EM
+  results_convergence <- matrix(NA, nrow = n_simulations, ncol = 3)
+  results_robustness <- matrix(NA, nrow = n_simulations, ncol = 3)
+  results_time <- matrix(NA, nrow = n_simulations, ncol = 3)
+  
+  for (i in 1:n_simulations) {
+    # Generate synthetic data
+    x <- rnorm(n, mean = 5, sd = 2)
+    log_odds <- true_beta[1] + true_beta[2] * x
+    prob <- 1 / (1 + exp(-log_odds))
+    y <- rbinom(n, size = 1, prob = prob)
+    
+    # Newton-Raphson
+    start_time <- Sys.time()
+    beta_nr <- newton_raphson_logistic(x, y, c(0, 0), tol = tol, max_iter = max_iter)
+    end_time <- Sys.time()
+    time_nr <- end_time - start_time
+    results_accuracy[i, 1] <- sum(abs(beta_nr - true_beta))
+    results_convergence[i, 1] <- max_iter
+    results_robustness[i, 1] <- sum(abs(beta_nr - true_beta))
+    results_time[i, 1] <- as.numeric(time_nr, units = "secs")
+    
+    # Fisher Scoring
+    start_time <- Sys.time()
+    beta_fs <- fisher_scoring_logistic(x, y, c(0, 0), tol = tol, max_iter = max_iter)
+    end_time <- Sys.time()
+    time_fs <- end_time - start_time
+    results_accuracy[i, 2] <- sum(abs(beta_fs - true_beta))
+    results_convergence[i, 2] <- max_iter
+    results_robustness[i, 2] <- sum(abs(beta_fs - true_beta))
+    results_time[i, 2] <- as.numeric(time_fs, units = "secs")
+    
+    # EM Algorithm
+    start_time <- Sys.time()
+    beta_em <- em_algorithm_logistic(x, y, c(0, 0), tol = tol, max_iter = max_iter)
+    end_time <- Sys.time()
+    time_em <- end_time - start_time
+    results_accuracy[i, 3] <- sum(abs(beta_em - true_beta))
+    results_convergence[i, 3] <- max_iter
+    results_robustness[i, 3] <- sum(abs(beta_em - true_beta))
+    results_time[i, 3] <- as.numeric(time_em, units = "secs")
+  }
+  
+  # Compute means
+  means_accuracy <- colMeans(results_accuracy, na.rm = TRUE)
+  means_convergence <- colMeans(results_convergence, na.rm = TRUE)
+  means_robustness <- colMeans(results_robustness, na.rm = TRUE)
+  means_time <- colMeans(results_time, na.rm = TRUE)
+  
+  # Return results
+  results <- list(
+    accuracy = means_accuracy,
+    convergence = means_convergence,
+    robustness = means_robustness,
+    time = means_time
+  )
+  return(results)
+}
+
+# Set parameters
+n_simulations <- 100
+n <- 100
+true_beta <- c(-2, 0.5)
+tol <- 1e-6
+max_iter <- 1000
+
+# Perform simulations and compare algorithms
+results <- compare_algorithms(n_simulations, n, true_beta, tol = tol, max_iter = max_iter)
+
+# Print results
+print("Accuracy:")
+print(results$accuracy)
+print("Convergence:")
+print(results$convergence)
+print("Robustness:")
+print(results$robustness)
+print("Time (seconds):")
+print(results$time)
+
+```
